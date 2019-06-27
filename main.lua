@@ -163,9 +163,7 @@ do
                         code = '',
                     })
                 end
-
-                L.ui.box('spacer', { width = '100%', height = 14 }, function()
-                end)
+                L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
 
                 -- Dropdown to select rule
                 local selectedRule
@@ -244,9 +242,38 @@ do
                         }
                     })
                 end
+                L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
 
-                L.ui.box('spacer', { width = '100%', height = 14 }, function()
-                end)
+                -- Dropdown to select entity
+                local selectedEntity
+                do
+                    local selectedEntityLine
+                    local entityLines = {}
+                    local entityLineToEntityId = {}
+                    for _, entity in pairs(self.game:getEntitiesWhere(function(e) return e.type ~= 'rule' end)) do
+                        local entityLine = entity.type .. ' (' .. entity.id .. ')'
+                        table.insert(entityLines, entityLine)
+                        entityLineToEntityId[entityLine] = entity.id
+                        if entity.id == selectedEntityId then
+                            selectedEntityLine = entityLine
+                        end
+                    end
+                    local selectedEntityLine = L.ui.dropdown('entity', selectedEntityLine, entityLines, {
+                        placeholder = 'select a entity...'
+                    })
+                    selectedEntityId = entityLineToEntityId[selectedEntityLine]
+
+                    selectedEntity = self.game:getEntityById(selectedEntityId)
+                    if not selectedEntity then
+                        selectedEntityId = nil
+                    end
+                end
+
+                -- Editor for selected entity
+                if selectedEntity then
+                    local pretty = serpent.block(selectedEntity)
+                    L.ui.markdown('```\n' .. pretty .. '\n```')
+                end
             end)
         end)
     end

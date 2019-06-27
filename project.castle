@@ -1,4 +1,4 @@
-main: main.lua
+main: entry_multiplayer.lua
 name: c r e a t i v e 2
 description: Make things together!
 owner: nikki

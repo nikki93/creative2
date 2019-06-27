@@ -82,7 +82,7 @@ function game.handleEvent(self, eventType, eventData)
     end
 end
 
-local network, server, client = simulsim.createGameNetwork(game, { mode = 'localhost' })
+local network, server, client = simulsim.createGameNetwork(game, { mode = SIMULSIM_MODE or 'local' })
 
 function server.load(self)
     self:fireEvent('add-rule', {

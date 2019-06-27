@@ -5,6 +5,19 @@ local simulsim = require 'https://raw.githubusercontent.com/nikki93/simulsim/2f7
 
 local game = simulsim.defineGame()
 
+local generateId
+do
+    local idChars = '01234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    function generateId()
+        local t = {}
+        for i = 1, 8 do
+            local r = L.math.random(1, #idChars)
+            t[i] = idChars:sub(r, r)
+        end
+        return table.concat(t)
+    end
+end
+
 local compileRule, callRule
 do
     local compileCache = {}
@@ -34,6 +47,7 @@ do
     end
 end
 
+local sortRules
 do
     local function compareRules(rule1, rule2)
         return (rule1.priority or 0) < (rule2.priority or 0)
@@ -65,25 +79,28 @@ function game.handleEvent(self, eventType, eventData)
     if eventType == 'add-rule' then
         self:spawnEntity({
             type = 'rule',
+            id = assert(eventData.id, "'add-rule' needs `id`"),
             clientId = eventData.clientId,
-            priority = assert(eventData.priority, 'rule needs `priority`'),
-            kind = assert(eventData.kind, 'rule needs `kind`'),
-            description = assert(eventData.description, 'rule needs `description`'),
-            code = assert(eventData.code, 'rule needs `code`'),
+            priority = assert(eventData.priority, "'add-rule' needs `priority`"),
+            kind = assert(eventData.kind, "'add-rule' needs `kind`"),
+            description = assert(eventData.description, "'add-rule' needs `description`"),
+            code = assert(eventData.code, "'add-rule' needs `code`"),
         })
     end
     if eventType == 'update-rule' then
         assert(eventData.id, "'update-rule' needs `id`")
         local rule = self:getEntityById(eventData.id)
         rule.clientId = eventData.clientId
-        rule.priority = assert(eventData.priority, 'rule needs `priority`')
-        rule.kind = assert(eventData.kind, 'rule needs `kind`')
-        rule.description = assert(eventData.description, 'rule needs `description`')
-        rule.code = assert(eventData.code, 'rule needs `code`')
+        rule.priority = assert(eventData.priority, "'update-rule' needs `priority`")
+        rule.kind = assert(eventData.kind, "'update-rule' needs `kind`")
+        rule.description = assert(eventData.description, "'update-rule' needs `description`")
+        rule.code = assert(eventData.code, "'update-rule' needs `code`")
     end
 
     if eventType == 'spawn-entity' then
-        self:spawnEntity(eventData.entity)
+        assert(eventData.id, "'spawn-entity' needs `id`")
+        assert(eventData.type, "'spawn-entity' needs `type`")
+        self:spawnEntity(eventData)
     end
 end
 
@@ -91,6 +108,7 @@ local network, server, client = simulsim.createGameNetwork(game, { mode = SIMULS
 
 function server.load(self)
     self:fireEvent('add-rule', {
+        id = generateId(),
         priority = 0,
         kind = 'draw',
         description = 'draw circles',
@@ -101,12 +119,11 @@ end)
 ]],
     })
     self:fireEvent('spawn-entity', {
-        entity = {
-            type = 'circle',
-            x = math.random(0, L.getWidth()),
-            y = math.random(0, L.getHeight()),
-            radius = math.random(20, 40),
-        }
+        id = generateId(),
+        type = 'circle',
+        x = math.random(0, L.getWidth()),
+        y = math.random(0, L.getHeight()),
+        radius = math.random(20, 40),
     })
 end
 
@@ -156,6 +173,7 @@ do
                 -- Button to add new rule
                 if L.ui.button('new rule') then
                     self:fireEvent('add-rule', {
+                        id = generateId(),
                         clientId = self.clientId,
                         priority = 0,
                         kind = 'draw',
@@ -234,12 +252,11 @@ do
                 -- Button to add new entity
                 if L.ui.button('new entity') then
                     self:fireEvent('spawn-entity', {
-                        entity = {
-                            type = 'circle',
-                            x = math.random(0, L.getWidth()),
-                            y = math.random(0, L.getHeight()),
-                            radius = math.random(20, 40),
-                        }
+                        id = generateId(),
+                        type = 'circle',
+                        x = math.random(0, L.getWidth()),
+                        y = math.random(0, L.getHeight()),
+                        radius = math.random(20, 40),
                     })
                 end
                 L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
@@ -250,7 +267,9 @@ do
                     local selectedEntityLine
                     local entityLines = {}
                     local entityLineToEntityId = {}
-                    for _, entity in pairs(self.game:getEntitiesWhere(function(e) return e.type ~= 'rule' end)) do
+                    for _, entity in pairs(self.game:getEntitiesWhere(function(e)
+                        return e.id and e.type ~= 'rule'
+                    end)) do
                         local entityLine = entity.type .. ' (' .. entity.id .. ')'
                         table.insert(entityLines, entityLine)
                         entityLineToEntityId[entityLine] = entity.id

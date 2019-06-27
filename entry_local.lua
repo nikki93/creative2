@@ -1,3 +1,3 @@
-SIMULSIM_MODE = 'local'
+SIMULSIM_MODE = 'localhost'
 
 require 'main'

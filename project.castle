@@ -4,5 +4,3 @@ description: Make things together!
 owner: nikki
 multiplayer:
     - enabled: true
-dimensions: 400x400
-scaling: on

@@ -3,6 +3,8 @@ serpent = require 'https://raw.githubusercontent.com/pkulchenko/serpent/879580fb
 
 local simulsim = require 'https://raw.githubusercontent.com/nikki93/simulsim/2f70863464fe1b573d1f07d947cdebbd9f710451/simulsim.lua'
 
+local WIDTH, HEIGHT = 800, 450
+
 local game = simulsim.defineGame()
 
 local generateId
@@ -23,23 +25,38 @@ do
     local compileCache = {}
 
     function compileRule(rule)
-        local cached = compileCache[rule.code]
+        local cacheKey = rule.id .. L.data.hash('md5', rule.code)
+
+        local cached = compileCache[cacheKey]
         if cached then
             return cached
         end
 
-        local compiled, err = load('local self = ...\n' .. rule.code, rule.id, 't', _G)
-        compileCache[rule.code] = compiled or err
-        if err then
+        local env = setmetatable({}, { __index = _G })
+        local compiled, err = load(rule.code, rule.description:sub(1, 24) .. ' (' .. rule.id .. ')', 't', env)
+        if not compiled then
             print(err)
+            return
         end
-        return compiled
+        local succeeded, err = pcall(compiled)
+        if not succeeded then
+            print(err)
+            return
+        end
+
+        compileCache[cacheKey] = env
+        return env
     end
 
-    function callRule(rule, ...)
+    function callRule(rule, funcName, ...)
         local compiled = compileRule(rule)
-        if type(compiled) == 'function' then
-            local succeeded, err = pcall(compiled, ...)
+        if compiled then
+            local func = compiled[funcName]
+            if not func then
+                print("rule '" .. rule.id .. "' didn't define function '" .. funcName .. "'")
+                return
+            end
+            local succeeded, err = pcall(func, ...)
             if not succeeded then
                 print(err)
             end
@@ -70,7 +87,7 @@ function game.update(self, dt)
     local sortedRules = sortRules(self:getEntitiesWhere({ type = 'rule' }))
     for _, rule in ipairs(sortedRules) do
         if rule.kind == 'update' then
-            callRule(rule, self)
+            callRule(rule, 'update', self, dt)
         end
     end
 end
@@ -113,16 +130,18 @@ function server.load(self)
         kind = 'draw',
         description = 'draw circles',
         code = [[
-self:forEachEntityWhere({ type = 'circle' }, function(e)
-    L.circle('fill', e.x, e.y, e.radius)
-end)
+function draw(game)
+    game:forEachEntityWhere({ type = 'circle' }, function(e)
+        L.circle('fill', e.x, e.y, e.radius)
+    end)
+end
 ]],
     })
     self:fireEvent('spawn-entity', {
         id = generateId(),
         type = 'circle',
-        x = math.random(0, L.getWidth()),
-        y = math.random(0, L.getHeight()),
+        x = math.random(0, WIDTH),
+        y = math.random(0, HEIGHT),
         radius = math.random(20, 40),
     })
 end
@@ -143,7 +162,7 @@ function client.draw(self)
     for _, rule in ipairs(sortedRules) do
         if rule.kind == 'draw' then
             L.stacked('all', function()
-                callRule(rule, self.game)
+                callRule(rule, 'draw', self.game)
             end)
         end
     end
@@ -178,8 +197,11 @@ do
                         priority = 0,
                         kind = 'draw',
                         description = 'new rule',
-                        code = '',
-                    })
+                        code = [[
+function draw(game)
+end
+]],
+                    }, { maxFramesLate = 120 })
                 end
                 L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
 
@@ -254,10 +276,10 @@ do
                     self:fireEvent('spawn-entity', {
                         id = generateId(),
                         type = 'circle',
-                        x = math.random(0, L.getWidth()),
-                        y = math.random(0, L.getHeight()),
+                        x = math.random(0, WIDTH),
+                        y = math.random(0, HEIGHT),
                         radius = math.random(20, 40),
-                    })
+                    }, { maxFramesLate = 120 })
                 end
                 L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
 

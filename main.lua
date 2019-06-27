@@ -1,4 +1,5 @@
-L = require('https://raw.githubusercontent.com/nikki93/L/3f63e72eef6b19a9bab9a937e17e527ae4e22230/L.lua')
+L = require 'https://raw.githubusercontent.com/nikki93/L/3f63e72eef6b19a9bab9a937e17e527ae4e22230/L.lua'
+serpent = require 'https://raw.githubusercontent.com/pkulchenko/serpent/879580fb21933f63eb23ece7d60ba2349a8d2848/src/serpent.lua'
 
 local simulsim = require 'https://raw.githubusercontent.com/nikki93/simulsim/2f70863464fe1b573d1f07d947cdebbd9f710451/simulsim.lua'
 
@@ -80,6 +81,10 @@ function game.handleEvent(self, eventType, eventData)
         rule.description = assert(eventData.description, 'rule needs `description`')
         rule.code = assert(eventData.code, 'rule needs `code`')
     end
+
+    if eventType == 'spawn-entity' then
+        self:spawnEntity(eventData.entity)
+    end
 end
 
 local network, server, client = simulsim.createGameNetwork(game, { mode = SIMULSIM_MODE or 'local' })
@@ -88,10 +93,20 @@ function server.load(self)
     self:fireEvent('add-rule', {
         priority = 0,
         kind = 'draw',
-        description = 'draw a circle!',
+        description = 'draw circles',
         code = [[
-L.circle('fill', 200, 200, 40)
+self:forEachEntityWhere({ type = 'circle' }, function(e)
+    L.circle('fill', e.x, e.y, e.radius)
+end)
 ]],
+    })
+    self:fireEvent('spawn-entity', {
+        entity = {
+            type = 'circle',
+            x = math.random(0, L.getWidth()),
+            y = math.random(0, L.getHeight()),
+            radius = math.random(20, 40),
+        }
     })
 end
 
@@ -128,6 +143,7 @@ end
 
 do
     local selectedRuleId
+    local selectedEntityId
 
     function castle.uiupdate()
         local self = clientSelf
@@ -135,81 +151,103 @@ do
             return
         end
 
-        -- Button to add new rule
-        if L.ui.button('new rule') then
-            self:fireEvent('add-rule', {
-                clientId = self.clientId,
-                priority = 0,
-                kind = 'draw',
-                description = 'draw a circle!',
-                code = [[
-L.circle('fill', ]] .. math.random(0, L.getWidth()) .. [[, ]] .. math.random(0, L.getHeight()) .. [[, 40)
-        ]],
-            })
-        end
-
-        -- Dropdown to select rule
-        local selectedRule
-        do
-            local selectedRuleLine
-            local ruleLines = {}
-            local ruleLineToRuleId = {}
-            for _, rule in pairs(self.game:getEntitiesWhere({ type = 'rule' })) do
-                local ruleLine = rule.description .. ' (' .. rule.id .. ')'
-                table.insert(ruleLines, ruleLine)
-                ruleLineToRuleId[ruleLine] = rule.id
-                if rule.id == selectedRuleId then
-                    selectedRuleLine = ruleLine
+        L.ui.tabs('top', function()
+            L.ui.tab('rules', function()
+                -- Button to add new rule
+                if L.ui.button('new rule') then
+                    self:fireEvent('add-rule', {
+                        clientId = self.clientId,
+                        priority = 0,
+                        kind = 'draw',
+                        description = 'new rule',
+                        code = '',
+                    })
                 end
-            end
-            local selectedRuleLine = L.ui.dropdown('rule', selectedRuleLine, ruleLines, {
-                placeholder = 'select a rule...'
-            })
-            selectedRuleId = ruleLineToRuleId[selectedRuleLine]
 
-            selectedRule = self.game:getEntityById(selectedRuleId)
-            if not selectedRule then
-                selectedRuleId = nil
-            end
-        end
+                L.ui.box('spacer', { width = '100%', height = 14 }, function()
+                end)
 
-        -- Editor for selected rule
-        if selectedRule then
-            local newRule = {}
-            for k, v in pairs(selectedRule) do
-                newRule[k] = v
-            end
+                -- Dropdown to select rule
+                local selectedRule
+                do
+                    local selectedRuleLine
+                    local ruleLines = {}
+                    local ruleLineToRuleId = {}
+                    for _, rule in pairs(self.game:getEntitiesWhere({ type = 'rule' })) do
+                        local ruleLine = rule.description .. ' (' .. rule.id .. ')'
+                        table.insert(ruleLines, ruleLine)
+                        ruleLineToRuleId[ruleLine] = rule.id
+                        if rule.id == selectedRuleId then
+                            selectedRuleLine = ruleLine
+                        end
+                    end
+                    local selectedRuleLine = L.ui.dropdown('rule', selectedRuleLine, ruleLines, {
+                        placeholder = 'select a rule...'
+                    })
+                    selectedRuleId = ruleLineToRuleId[selectedRuleLine]
 
-            newRule.priority = L.ui.numberInput('priority', selectedRule.priority)
-
-            newRule.kind = L.ui.dropdown('kind', selectedRule.kind, {
-                'draw', 'update', 'ui',
-            })
-
-            newRule.description = L.ui.textInput('description', selectedRule.description, {
-                maxLength = 80,
-            })
-
-            newRule.code = L.ui.codeEditor('code', selectedRule.code)
-
-            local changed = false
-            for k, v in pairs(newRule) do
-                if selectedRule[k] ~= newRule[k] then
-                    changed = true
-                    break
+                    selectedRule = self.game:getEntityById(selectedRuleId)
+                    if not selectedRule then
+                        selectedRuleId = nil
+                    end
                 end
-            end
-            for k, v in pairs(selectedRule) do
-                if selectedRule[k] ~= newRule[k] then
-                    changed = true
-                    break
+
+                -- Editor for selected rule
+                if selectedRule then
+                    local newRule = {}
+                    for k, v in pairs(selectedRule) do
+                        newRule[k] = v
+                    end
+
+                    newRule.priority = L.ui.numberInput('priority', selectedRule.priority)
+
+                    newRule.kind = L.ui.dropdown('kind', selectedRule.kind, {
+                        'draw', 'update', 'ui',
+                    })
+
+                    newRule.description = L.ui.textInput('description', selectedRule.description, {
+                        maxLength = 80,
+                    })
+
+                    newRule.code = L.ui.codeEditor('code', selectedRule.code)
+
+                    local changed = false
+                    for k, v in pairs(newRule) do
+                        if selectedRule[k] ~= newRule[k] then
+                            changed = true
+                            break
+                        end
+                    end
+                    for k, v in pairs(selectedRule) do
+                        if selectedRule[k] ~= newRule[k] then
+                            changed = true
+                            break
+                        end
+                    end
+                    if changed then
+                        newRule.clientId = self.clientId
+                        self.game:temporarilyDisableSyncForEntity(selectedRule)
+                        self:fireEvent('update-rule', newRule, { maxFramesLate = 120 })
+                    end
                 end
-            end
-            if changed then
-                newRule.clientId = self.clientId
-                self.game:temporarilyDisableSyncForEntity(selectedRule)
-                self:fireEvent('update-rule', newRule, { maxFramesLate = 120 })
-            end
-        end
+            end)
+
+            L.ui.tab('entities', function()
+                -- Button to add new entity
+                if L.ui.button('new entity') then
+                    self:fireEvent('spawn-entity', {
+                        entity = {
+                            type = 'circle',
+                            x = math.random(0, L.getWidth()),
+                            y = math.random(0, L.getHeight()),
+                            radius = math.random(20, 40),
+                        }
+                    })
+                end
+
+                L.ui.box('spacer', { width = '100%', height = 14 }, function()
+                end)
+            end)
+        end)
     end
 end

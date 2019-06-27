@@ -40,7 +40,7 @@ do
 
     function sortRules(rules)
         local sorted = {}
-        for id, rule in pairs(rules) do
+        for _, rule in pairs(rules) do
             table.insert(sorted, rule)
         end
         table.sort(sorted, compareRules)
@@ -49,37 +49,49 @@ do
 end
 
 function game.load(self)
-    self.data.rules = {}
 end
 
 function game.update(self, dt)
-    local sortedRules = sortRules(self.data.rules)
+    local sortedRules = sortRules(self:getEntitiesWhere({ type = 'rule' }))
     for _, rule in ipairs(sortedRules) do
-        if rule.type == 'update' then
+        if rule.kind == 'update' then
             callRule(rule, self)
         end
     end
 end
 
 function game.handleEvent(self, eventType, eventData)
-    if eventType == 'set-rule' then
-        self.data.rules[eventData.rule.id] = eventData.rule
+    if eventType == 'add-rule' then
+        self:spawnEntity({
+            type = 'rule',
+            clientId = eventData.clientId,
+            priority = assert(eventData.priority, 'rule needs `priority`'),
+            kind = assert(eventData.kind, 'rule needs `kind`'),
+            description = assert(eventData.description, 'rule needs `description`'),
+            code = assert(eventData.code, 'rule needs `code`'),
+        })
+    end
+    if eventType == 'update-rule' then
+        assert(eventData.id, "'update-rule' needs `id`")
+        local rule = self:getEntityById(eventData.id)
+        rule.clientId = eventData.clientId
+        rule.priority = assert(eventData.priority, 'rule needs `priority`')
+        rule.kind = assert(eventData.kind, 'rule needs `kind`')
+        rule.description = assert(eventData.description, 'rule needs `description`')
+        rule.code = assert(eventData.code, 'rule needs `code`')
     end
 end
 
 local network, server, client = simulsim.createGameNetwork(game, { mode = 'localhost' })
 
 function server.load(self)
-    self:fireEvent('set-rule', {
-        rule = {
-            id = math.random(2000),
-            priority = 0,
-            type = 'draw',
-            description = 'Draw a circle!',
-            code = [[
+    self:fireEvent('add-rule', {
+        priority = 0,
+        kind = 'draw',
+        description = 'draw a circle!',
+        code = [[
 L.circle('fill', 200, 200, 40)
 ]],
-        },
     })
 end
 
@@ -95,11 +107,12 @@ function client.update(self, dt)
 end
 
 function client.draw(self)
-    local sortedRules = sortRules(self.game.data.rules)
+    local sortedRules = sortRules(self.game:getEntitiesWhere({ type = 'rule' }))
     for _, rule in ipairs(sortedRules) do
-        if rule.type == 'draw' then
+        if rule.kind == 'draw' then
             callRule(rule, self.game)
         end
+        L.print('clientId: ' .. tostring(rule.clientId), 3, 23)
     end
     if self:isConnecting() then
         L.print('Connecting...', 3, 3)
@@ -123,16 +136,14 @@ do
 
         -- Button to add new rule
         if L.ui.button('new rule') then
-            self:fireEvent('set-rule', {
-                rule = {
-                    id = math.random(2000),
-                    priority = 0,
-                    type = 'draw',
-                    description = 'draw a circle!',
-                    code = [[
-        L.circle('fill', ]] .. math.random(0, L.getWidth()) .. [[, ]] .. math.random(0, L.getHeight()) .. [[, 40)
+            self:fireEvent('add-rule', {
+                clientId = self.clientId,
+                priority = 0,
+                kind = 'draw',
+                description = 'draw a circle!',
+                code = [[
+L.circle('fill', ]] .. math.random(0, L.getWidth()) .. [[, ]] .. math.random(0, L.getHeight()) .. [[, 40)
         ]],
-                },
             })
         end
 
@@ -142,11 +153,11 @@ do
             local selectedRuleLine
             local ruleLines = {}
             local ruleLineToRuleId = {}
-            for id, rule in pairs(self.game.data.rules) do
+            for _, rule in pairs(self.game:getEntitiesWhere({ type = 'rule' })) do
                 local ruleLine = rule.description .. ' (' .. rule.id .. ')'
                 table.insert(ruleLines, ruleLine)
-                ruleLineToRuleId[ruleLine] = id
-                if id == selectedRuleId then
+                ruleLineToRuleId[ruleLine] = rule.id
+                if rule.id == selectedRuleId then
                     selectedRuleLine = ruleLine
                 end
             end
@@ -155,7 +166,7 @@ do
             })
             selectedRuleId = ruleLineToRuleId[selectedRuleLine]
 
-            selectedRule = self.game.data.rules[selectedRuleId]
+            selectedRule = self.game:getEntityById(selectedRuleId)
             if not selectedRule then
                 selectedRuleId = nil
             end
@@ -170,7 +181,7 @@ do
 
             newRule.priority = L.ui.numberInput('priority', selectedRule.priority)
 
-            newRule.type = L.ui.dropdown('type', selectedRule.type, {
+            newRule.kind = L.ui.dropdown('kind', selectedRule.kind, {
                 'draw', 'update', 'ui',
             })
 
@@ -194,7 +205,9 @@ do
                 end
             end
             if changed then
-                self:fireEvent('set-rule', { rule = newRule })
+                newRule.clientId = self.clientId
+                print('clientId: ' .. tostring(self.clientId))
+                self:fireEvent('update-rule', newRule)
             end
         end
     end

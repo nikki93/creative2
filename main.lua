@@ -110,7 +110,9 @@ function client.draw(self)
     local sortedRules = sortRules(self.game:getEntitiesWhere({ type = 'rule' }))
     for _, rule in ipairs(sortedRules) do
         if rule.kind == 'draw' then
-            callRule(rule, self.game)
+            L.stacked('all', function()
+                callRule(rule, self.game)
+            end)
         end
         L.print('clientId: ' .. tostring(rule.clientId), 3, 23)
     end
@@ -207,7 +209,8 @@ L.circle('fill', ]] .. math.random(0, L.getWidth()) .. [[, ]] .. math.random(0, 
             if changed then
                 newRule.clientId = self.clientId
                 print('clientId: ' .. tostring(self.clientId))
-                self:fireEvent('update-rule', newRule)
+                self.game:temporarilyDisableSyncForEntity(selectedRule)
+                self:fireEvent('update-rule', newRule, { maxFramesLate = 120 })
             end
         end
     end

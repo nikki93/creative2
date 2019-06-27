@@ -114,7 +114,6 @@ function client.draw(self)
                 callRule(rule, self.game)
             end)
         end
-        L.print('clientId: ' .. tostring(rule.clientId), 3, 23)
     end
     if self:isConnecting() then
         L.print('Connecting...', 3, 3)
@@ -208,7 +207,6 @@ L.circle('fill', ]] .. math.random(0, L.getWidth()) .. [[, ]] .. math.random(0, 
             end
             if changed then
                 newRule.clientId = self.clientId
-                print('clientId: ' .. tostring(self.clientId))
                 self.game:temporarilyDisableSyncForEntity(selectedRule)
                 self:fireEvent('update-rule', newRule, { maxFramesLate = 120 })
             end

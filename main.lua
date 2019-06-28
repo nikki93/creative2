@@ -5,7 +5,36 @@ local simulsim = require 'https://raw.githubusercontent.com/nikki93/simulsim/2f7
 
 local WIDTH, HEIGHT = 800, 450
 
-local game = simulsim.defineGame()
+local errCache = {}
+
+local function reportError(rule, err)
+    local file, line, message = err:match('^(.-):(%d+):(.+)')
+    file = file:gsub('^%[string "', '')
+    file = file:gsub('"%]$', '')
+
+    message = message:match('^[^\n]*')
+
+    local cacheKey = rule.id .. file .. line .. message
+    local cached = errCache[cacheKey]
+    if cached then
+        cached.count = cached.count + 1
+        cached.time = L.getTime()
+    else
+        cached = {}
+        errCache[cacheKey] = cached
+        cached.short = file:gsub(' %(' .. rule.id .. '%)', '') .. ':' .. line .. ':' .. message .. ' (' .. rule.id .. ')'
+        cached.key = rule.cacheKey
+        cached.ruleId = rule.id
+        cached.file = file
+        cached.line = line
+        cached.message = message
+        cached.full = err
+        cached.count = 1
+        cached.time = L.getTime()
+
+        print("ERROR: New error in rule '" .. rule.description .. "' (" .. rule.id .. "):\n" .. message)
+    end
+end
 
 local generateId
 do
@@ -35,12 +64,12 @@ do
         local env = setmetatable({}, { __index = _G })
         local compiled, err = load(rule.code, rule.description:sub(1, 24) .. ' (' .. rule.id .. ')', 't', env)
         if not compiled then
-            print(err)
+            reportError(rule, err)
             return
         end
-        local succeeded, err = pcall(compiled)
+        local succeeded, err = xpcall(compiled, debug.traceback)
         if not succeeded then
-            print(err)
+            reportError(rule, err)
             return
         end
 
@@ -53,12 +82,12 @@ do
         if compiled then
             local func = compiled[funcName]
             if not func then
-                print("rule '" .. rule.id .. "' didn't define function '" .. funcName .. "'")
+                reportError(rule, "rule '" .. rule.id .. "' didn't define function '" .. funcName .. "'")
                 return
             end
-            local succeeded, err = pcall(func, ...)
+            local succeeded, err = xpcall(func, debug.traceback, ...)
             if not succeeded then
-                print(err)
+                reportError(rule, err)
             end
         end
     end
@@ -79,6 +108,8 @@ do
         return sorted
     end
 end
+
+local game = simulsim.defineGame()
 
 function game.load(self)
 end
@@ -180,6 +211,7 @@ end
 do
     local selectedRuleId
     local selectedEntityId
+    local selectedErrShort
 
     function castle.uiupdate()
         local self = clientSelf
@@ -299,7 +331,7 @@ end
                             selectedEntityLine = entityLine
                         end
                     end
-                    local selectedEntityLine = L.ui.dropdown('entity', selectedEntityLine, entityLines, {
+                    selectedEntityLine = L.ui.dropdown('entity', selectedEntityLine, entityLines, {
                         placeholder = 'select a entity...'
                     })
                     selectedEntityId = entityLineToEntityId[selectedEntityLine]
@@ -314,6 +346,44 @@ end
                 if selectedEntity then
                     local pretty = serpent.block(selectedEntity)
                     L.ui.markdown('```\n' .. pretty .. '\n```')
+                end
+            end)
+
+            L.ui.tab('errors', function()
+                local sortedErrs = {}
+                for _, err in pairs(errCache) do
+                    table.insert(sortedErrs, err)
+                end
+                table.sort(sortedErrs, function(e1, e2)
+                    return e1.time > e2.time
+                end)
+
+                local selectedErr
+                local errShorts = {}
+                local errShortToErrKey = {}
+                for i = 1, #sortedErrs do
+                    local err = sortedErrs[i]
+                    table.insert(errShorts, err.short)
+                    errShortToErrKey[err.short] = err.key
+                    if selectedErrShort == err.short then
+                        selectedErr = err
+                    end
+                end
+                selectedErrShort = L.ui.dropdown('error', selectedErrShort, errShorts, {
+                    placeholder = 'select an error...',
+                    onChange = function(val) print('selected: ' .. val) end,
+                })
+
+                if selectedErr then
+                    L.ui.markdown(
+                        '```\n' ..
+                        'rule: ' .. selectedErr.ruleId .. '\n' ..
+                        'count: ' .. selectedErr.count .. '\n' ..
+                        'file: ' .. selectedErr.file .. '\n' ..
+                        'line: ' .. selectedErr.line .. '\n' ..
+                        'stacktrace:\n' .. selectedErr.full .. '\n' ..
+                        '```'
+                    )
                 end
             end)
         end)

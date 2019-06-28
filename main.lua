@@ -178,6 +178,14 @@ function game.handleEvent(self, eventType, eventData)
 end
 
 local network, server, client = simulsim.createGameNetwork(game, { mode = SIMULSIM_MODE or 'local' })
+-- local network, server, client = simulsim.createGameNetwork(game, {
+--     mode = 'development',
+--     numClients = 1,
+--     latency = 0,
+--     latencyDeviation = 0,
+--     latencySpikeChance = 0,
+--     packetLossChance = 0,
+-- })
 
 function server.load(self)
     self:fireEvent('add-rule', {
@@ -283,7 +291,7 @@ end
                     selectedRuleLine = L.ui.dropdown('rule', selectedRuleLine, ruleLines, {
                         placeholder = 'select a rule...'
                     })
-                    selectedRuleId = ruleLineToRuleId[selectedRuleLine]
+                    selectedRuleId = ruleLineToRuleId[selectedRuleLine] or selectedRuleId
 
                     selectedRule = self.game:getEntityById(selectedRuleId)
                 end
@@ -291,7 +299,7 @@ end
                     if L.ui.button('remove rule') then
                         self:fireEvent('remove-rule', {
                             id = selectedRuleId
-                        })
+                        }, { maxFramesLate = 120 })
                         selectedRule, selectedRuleId = nil, nil
                     end
                 end
@@ -377,7 +385,7 @@ end
                     selectedEntityLine = L.ui.dropdown('entity', selectedEntityLine, entityLines, {
                         placeholder = 'select a entity...'
                     })
-                    selectedEntityId = entityLineToEntityId[selectedEntityLine]
+                    selectedEntityId = entityLineToEntityId[selectedEntityLine] or selectedEntityId
 
                     selectedEntity = self.game:getEntityById(selectedEntityId)
                 end
@@ -385,7 +393,7 @@ end
                     if L.ui.button('remove entity') then
                         self:fireEvent('despawn-entity', {
                             id = selectedEntityId
-                        })
+                        }, { maxFramesLate = 120 })
                         selectedEntity, selectedEntityId = nil, nil
                     end
                 end
@@ -433,7 +441,7 @@ end
                                     id = selectedEntity.id,
                                     propName = propName,
                                     propVal = newPropVal,
-                                })
+                                }, { maxFramesLate = 120 })
                             end
                         end
                     end)

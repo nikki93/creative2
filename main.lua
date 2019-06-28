@@ -138,17 +138,42 @@ function game.handleEvent(self, eventType, eventData)
     if eventType == 'update-rule' then
         assert(eventData.id, "'update-rule' needs `id`")
         local rule = self:getEntityById(eventData.id)
-        rule.clientId = eventData.clientId
-        rule.priority = assert(eventData.priority, "'update-rule' needs `priority`")
-        rule.kind = assert(eventData.kind, "'update-rule' needs `kind`")
-        rule.description = assert(eventData.description, "'update-rule' needs `description`")
-        rule.code = assert(eventData.code, "'update-rule' needs `code`")
+        if rule then
+            rule.clientId = eventData.clientId
+            rule.priority = assert(eventData.priority, "'update-rule' needs `priority`")
+            rule.kind = assert(eventData.kind, "'update-rule' needs `kind`")
+            rule.description = assert(eventData.description, "'update-rule' needs `description`")
+            rule.code = assert(eventData.code, "'update-rule' needs `code`")
+        end
+    end
+    if eventType == 'remove-rule' then
+        assert(eventData.id, "'remove-rule' needs `id`")
+        local rule = self:getEntityById(eventData.id)
+        if rule then
+            self:despawnEntity(rule)
+        end
     end
 
     if eventType == 'spawn-entity' then
         assert(eventData.id, "'spawn-entity' needs `id`")
         assert(eventData.type, "'spawn-entity' needs `type`")
         self:spawnEntity(eventData)
+    end
+    if eventType == 'update-entity-prop' then
+        assert(eventData.id, "'update-entity-prop' needs `id`")
+        assert(eventData.propName, "'update-entity-prop' needs `propName`")
+        assert(eventData.propVal, "'update-entity-prop' needs `propVal`")
+        local entity = self:getEntityById(eventData.id)
+        if entity then
+            entity[eventData.propName] = eventData.propVal
+        end
+    end
+    if eventType == 'despawn-entity' then
+        assert(eventData.id, "'remove-rule' needs `id`")
+        local entity = self:getEntityById(eventData.id)
+        if entity then
+            self:despawnEntity(entity)
+        end
     end
 end
 
@@ -222,9 +247,10 @@ do
         L.ui.tabs('top', function()
             L.ui.tab('rules', function()
                 -- Button to add new rule
-                if L.ui.button('new rule') then
+                if L.ui.button('add rule') then
+                    local newId = generateId()
                     self:fireEvent('add-rule', {
-                        id = generateId(),
+                        id = newId,
                         clientId = self.clientId,
                         priority = 0,
                         kind = 'draw',
@@ -234,7 +260,10 @@ function draw(game)
 end
 ]],
                     }, { maxFramesLate = 120 })
+                    selectedRuleId = newId
                 end
+                L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
+                L.ui.markdown('---')
                 L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
 
                 -- Dropdown to select rule
@@ -257,10 +286,18 @@ end
                     selectedRuleId = ruleLineToRuleId[selectedRuleLine]
 
                     selectedRule = self.game:getEntityById(selectedRuleId)
-                    if not selectedRule then
-                        selectedRuleId = nil
+                end
+                if selectedRule then
+                    if L.ui.button('remove rule') then
+                        self:fireEvent('remove-rule', {
+                            id = selectedRuleId
+                        })
+                        selectedRule, selectedRuleId = nil, nil
                     end
                 end
+                L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
+                L.ui.markdown('---')
+                L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
 
                 -- Editor for selected rule
                 if selectedRule then
@@ -269,8 +306,6 @@ end
                         newRule[k] = v
                     end
 
-                    newRule.priority = L.ui.numberInput('priority', selectedRule.priority)
-
                     newRule.kind = L.ui.dropdown('kind', selectedRule.kind, {
                         'draw', 'update', 'ui',
                     })
@@ -278,6 +313,8 @@ end
                     newRule.description = L.ui.textInput('description', selectedRule.description, {
                         maxLength = 80,
                     })
+
+                    newRule.priority = L.ui.numberInput('priority', selectedRule.priority)
 
                     newRule.code = L.ui.codeEditor('code', selectedRule.code)
 
@@ -304,15 +341,19 @@ end
 
             L.ui.tab('entities', function()
                 -- Button to add new entity
-                if L.ui.button('new entity') then
+                if L.ui.button('add entity') then
+                    local newId = generateId()
                     self:fireEvent('spawn-entity', {
-                        id = generateId(),
+                        id = newId,
                         type = 'circle',
                         x = math.random(0, WIDTH),
                         y = math.random(0, HEIGHT),
                         radius = math.random(20, 40),
                     }, { maxFramesLate = 120 })
+                    selectedEntityId = newId
                 end
+                L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
+                L.ui.markdown('---')
                 L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
 
                 -- Dropdown to select entity
@@ -337,15 +378,61 @@ end
                     selectedEntityId = entityLineToEntityId[selectedEntityLine]
 
                     selectedEntity = self.game:getEntityById(selectedEntityId)
-                    if not selectedEntity then
-                        selectedEntityId = nil
+                end
+                if selectedEntity then
+                    if L.ui.button('remove entity') then
+                        self:fireEvent('despawn-entity', {
+                            id = selectedEntityId
+                        })
+                        selectedEntity, selectedEntityId = nil, nil
                     end
                 end
+                L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
+                L.ui.markdown('---')
+                L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
 
                 -- Editor for selected entity
                 if selectedEntity then
                     local pretty = serpent.block(selectedEntity)
-                    L.ui.markdown('```\n' .. pretty .. '\n```')
+
+                    local sortedPropNames = {}
+                    for propName in pairs(selectedEntity) do
+                        if propName ~= 'id' then
+                            table.insert(sortedPropNames, propName)
+                        end
+                    end
+                    table.sort(sortedPropNames, function(a, b)
+                        if a == 'type' then
+                            return true
+                        end
+                        if b == 'type' then
+                            return false
+                        end
+                        return a < b
+                    end)
+
+                    for _, propName in ipairs(sortedPropNames) do
+                        local propVal = selectedEntity[propName]
+                        local newPropVal
+
+                        local propType = type(propVal)
+
+                        if propType == 'number' then
+                            newPropVal = L.ui.numberInput(propName, propVal)
+                        elseif propType == 'string' then
+                            newPropVal = L.ui.textInput(propName, propVal)
+                        elseif propType == 'boolean' then
+                            newPropVal = L.ui.checkbox(propName, propVal)
+                        end
+
+                        if newPropVal ~= propVal then
+                            self:fireEvent('update-entity-prop', {
+                                id = selectedEntity.id,
+                                propName = propName,
+                                propVal = newPropVal,
+                            })
+                        end
+                    end
                 end
             end)
 
@@ -371,7 +458,6 @@ end
                 end
                 selectedErrShort = L.ui.dropdown('error', selectedErrShort, errShorts, {
                     placeholder = 'select an error...',
-                    onChange = function(val) print('selected: ' .. val) end,
                 })
 
                 if selectedErr then

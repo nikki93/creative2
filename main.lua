@@ -280,7 +280,7 @@ end
                             selectedRuleLine = ruleLine
                         end
                     end
-                    local selectedRuleLine = L.ui.dropdown('rule', selectedRuleLine, ruleLines, {
+                    selectedRuleLine = L.ui.dropdown('rule', selectedRuleLine, ruleLines, {
                         placeholder = 'select a rule...'
                     })
                     selectedRuleId = ruleLineToRuleId[selectedRuleLine]
@@ -301,41 +301,43 @@ end
 
                 -- Editor for selected rule
                 if selectedRule then
-                    local newRule = {}
-                    for k, v in pairs(selectedRule) do
-                        newRule[k] = v
-                    end
-
-                    newRule.kind = L.ui.dropdown('kind', selectedRule.kind, {
-                        'draw', 'update', 'ui',
-                    })
-
-                    newRule.description = L.ui.textInput('description', selectedRule.description, {
-                        maxLength = 80,
-                    })
-
-                    newRule.priority = L.ui.numberInput('priority', selectedRule.priority)
-
-                    newRule.code = L.ui.codeEditor('code', selectedRule.code)
-
-                    local changed = false
-                    for k, v in pairs(newRule) do
-                        if selectedRule[k] ~= newRule[k] then
-                            changed = true
-                            break
+                    L.ui.box('editor-' .. selectedRuleId, function()
+                        local newRule = {}
+                        for k, v in pairs(selectedRule) do
+                            newRule[k] = v
                         end
-                    end
-                    for k, v in pairs(selectedRule) do
-                        if selectedRule[k] ~= newRule[k] then
-                            changed = true
-                            break
+
+                        newRule.kind = L.ui.dropdown('kind', selectedRule.kind, {
+                            'draw', 'update', 'ui',
+                        })
+
+                        newRule.description = L.ui.textInput('description', selectedRule.description, {
+                            maxLength = 80,
+                        })
+
+                        newRule.priority = L.ui.numberInput('priority', selectedRule.priority)
+
+                        newRule.code = L.ui.codeEditor('code', selectedRule.code)
+
+                        local changed = false
+                        for k, v in pairs(newRule) do
+                            if selectedRule[k] ~= newRule[k] then
+                                changed = true
+                                break
+                            end
                         end
-                    end
-                    if changed then
-                        newRule.clientId = self.clientId
-                        self.game:temporarilyDisableSyncForEntity(selectedRule)
-                        self:fireEvent('update-rule', newRule, { maxFramesLate = 120 })
-                    end
+                        for k, v in pairs(selectedRule) do
+                            if selectedRule[k] ~= newRule[k] then
+                                changed = true
+                                break
+                            end
+                        end
+                        if changed then
+                            newRule.clientId = self.clientId
+                            self.game:temporarilyDisableSyncForEntity(selectedRule)
+                            self:fireEvent('update-rule', newRule, { maxFramesLate = 120 })
+                        end
+                    end)
                 end
             end)
 
@@ -393,46 +395,48 @@ end
 
                 -- Editor for selected entity
                 if selectedEntity then
-                    local pretty = serpent.block(selectedEntity)
+                    L.ui.box('editor-' .. selectedEntityId, function()
+                        local pretty = serpent.block(selectedEntity)
 
-                    local sortedPropNames = {}
-                    for propName in pairs(selectedEntity) do
-                        if propName ~= 'id' then
-                            table.insert(sortedPropNames, propName)
+                        local sortedPropNames = {}
+                        for propName in pairs(selectedEntity) do
+                            if propName ~= 'id' then
+                                table.insert(sortedPropNames, propName)
+                            end
                         end
-                    end
-                    table.sort(sortedPropNames, function(a, b)
-                        if a == 'type' then
-                            return true
+                        table.sort(sortedPropNames, function(a, b)
+                            if a == 'type' then
+                                return true
+                            end
+                            if b == 'type' then
+                                return false
+                            end
+                            return a < b
+                        end)
+
+                        for _, propName in ipairs(sortedPropNames) do
+                            local propVal = selectedEntity[propName]
+                            local newPropVal
+
+                            local propType = type(propVal)
+
+                            if propType == 'number' then
+                                newPropVal = L.ui.numberInput(propName, propVal)
+                            elseif propType == 'string' then
+                                newPropVal = L.ui.textInput(propName, propVal)
+                            elseif propType == 'boolean' then
+                                newPropVal = L.ui.checkbox(propName, propVal)
+                            end
+
+                            if newPropVal ~= propVal then
+                                self:fireEvent('update-entity-prop', {
+                                    id = selectedEntity.id,
+                                    propName = propName,
+                                    propVal = newPropVal,
+                                })
+                            end
                         end
-                        if b == 'type' then
-                            return false
-                        end
-                        return a < b
                     end)
-
-                    for _, propName in ipairs(sortedPropNames) do
-                        local propVal = selectedEntity[propName]
-                        local newPropVal
-
-                        local propType = type(propVal)
-
-                        if propType == 'number' then
-                            newPropVal = L.ui.numberInput(propName, propVal)
-                        elseif propType == 'string' then
-                            newPropVal = L.ui.textInput(propName, propVal)
-                        elseif propType == 'boolean' then
-                            newPropVal = L.ui.checkbox(propName, propVal)
-                        end
-
-                        if newPropVal ~= propVal then
-                            self:fireEvent('update-entity-prop', {
-                                id = selectedEntity.id,
-                                propName = propName,
-                                propVal = newPropVal,
-                            })
-                        end
-                    end
                 end
             end)
 

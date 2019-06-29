@@ -134,14 +134,12 @@ function game.handleEvent(self, eventType, eventData)
             code = assert(eventData.code, "'add-rule' needs `code`"),
         })
     end
-    if eventType == 'update-rule' then
-        assert(eventData.id, "'update-rule' needs `id`")
+    if eventType == 'update-rule-prop' then
+        assert(eventData.id, "'update-rule-prop' needs `id`")
+        assert(eventData.propName, "'update-rule-prop' needs `propVal`")
         local rule = self:getEntityById(eventData.id)
         if rule then
-            rule.priority = assert(eventData.priority, "'update-rule' needs `priority`")
-            rule.kind = assert(eventData.kind, "'update-rule' needs `kind`")
-            rule.description = assert(eventData.description, "'update-rule' needs `description`")
-            rule.code = assert(eventData.code, "'update-rule' needs `code`")
+            rule[eventData.propName] = eventData.propVal
         end
     end
     if eventType == 'remove-rule' then
@@ -160,7 +158,6 @@ function game.handleEvent(self, eventType, eventData)
     if eventType == 'update-entity-prop' then
         assert(eventData.id, "'update-entity-prop' needs `id`")
         assert(eventData.propName, "'update-entity-prop' needs `propName`")
-        assert(eventData.propVal, "'update-entity-prop' needs `propVal`")
         local entity = self:getEntityById(eventData.id)
         if entity then
             entity[eventData.propName] = eventData.propVal
@@ -311,40 +308,35 @@ end
                 -- Editor for selected rule
                 if selectedRule then
                     L.ui.box('editor-' .. selectedRuleId, function()
-                        local newRule = {}
-                        for k, v in pairs(selectedRule) do
-                            newRule[k] = v
+                        local function onChange(propName)
+                            return function(newVal)
+                                self.game:temporarilyDisableSyncForEntity(selectedRule)
+                                self:fireEvent('update-rule-prop', {
+                                    id = selectedRule.id,
+                                    propName = propName,
+                                    propVal = newVal,
+                                })
+                            end
                         end
 
-                        newRule.kind = L.ui.dropdown('kind', selectedRule.kind, {
+                        L.ui.dropdown('kind', selectedRule.kind, {
                             'draw', 'update', 'ui',
+                        }, {
+                            onChange = onChange('kind'),
                         })
 
-                        newRule.description = L.ui.textInput('description', selectedRule.description, {
+                        L.ui.textInput('description', selectedRule.description, {
                             maxLength = 80,
+                            onChange = onChange('description'),
                         })
 
-                        newRule.priority = L.ui.numberInput('priority', selectedRule.priority)
+                        L.ui.numberInput('priority', selectedRule.priority, {
+                            onChange = onChange('priority'),
+                        })
 
-                        newRule.code = L.ui.codeEditor('code', selectedRule.code)
-
-                        local changed = false
-                        for k, v in pairs(newRule) do
-                            if selectedRule[k] ~= newRule[k] then
-                                changed = true
-                                break
-                            end
-                        end
-                        for k, v in pairs(selectedRule) do
-                            if selectedRule[k] ~= newRule[k] then
-                                changed = true
-                                break
-                            end
-                        end
-                        if changed then
-                            self.game:temporarilyDisableSyncForEntity(selectedRule)
-                            self:fireEvent('update-rule', newRule, { maxFramesLate = 120 })
-                        end
+                        L.ui.codeEditor('code', selectedRule.code, {
+                            onChange = onChange('code'),
+                        })
                     end)
                 end
             end)
@@ -437,6 +429,7 @@ end
                             end
 
                             if newPropVal ~= propVal then
+                                self.game:temporarilyDisableSyncForEntity(selectedRule)
                                 self:fireEvent('update-entity-prop', {
                                     id = selectedEntity.id,
                                     propName = propName,

@@ -5,6 +5,12 @@ simulsim = require 'https://raw.githubusercontent.com/nikki93/simulsim/6ce85976c
 
 local WIDTH, HEIGHT = 800, 450
 
+local function uiSpacer()
+    L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
+    L.ui.markdown('---')
+    L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
+end
+
 local errCache = {}
 
 local function reportError(rule, err)
@@ -268,9 +274,7 @@ end
                     }, { maxFramesLate = 120 })
                     selectedRuleId = newId
                 end
-                L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
-                L.ui.markdown('---')
-                L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
+                uiSpacer()
 
                 -- Dropdown to select rule
                 local selectedRule
@@ -301,9 +305,7 @@ end
                         selectedRule, selectedRuleId = nil, nil
                     end
                 end
-                L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
-                L.ui.markdown('---')
-                L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
+                uiSpacer()
 
                 -- Editor for selected rule
                 if selectedRule then
@@ -354,9 +356,7 @@ end
                     }, { maxFramesLate = 120 })
                     selectedEntityId = newId
                 end
-                L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
-                L.ui.markdown('---')
-                L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
+                uiSpacer()
 
                 -- Dropdown to select entity
                 local selectedEntity
@@ -389,9 +389,7 @@ end
                         selectedEntity, selectedEntityId = nil, nil
                     end
                 end
-                L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
-                L.ui.markdown('---')
-                L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
+                uiSpacer()
 
                 -- Editor for selected entity
                 if selectedEntity then

@@ -3,13 +3,16 @@ serpent = require 'https://raw.githubusercontent.com/pkulchenko/serpent/879580fb
 
 simulsim = require 'https://raw.githubusercontent.com/nikki93/simulsim/6ce85976c13545613810677af67f2f2fc1cc4e2d/simulsim.lua'
 
+
 local WIDTH, HEIGHT = 800, 450
+
 
 local function uiSpacer()
     L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
     L.ui.markdown('---')
     L.ui.box('spacer', { width = '100%', height = 14 }, function() end)
 end
+
 
 local errCache = {}
 
@@ -42,6 +45,7 @@ local function reportError(rule, err)
     end
 end
 
+
 local generateId
 do
     local idChars = '01234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -54,6 +58,7 @@ do
         return table.concat(t)
     end
 end
+
 
 local compileRule, callRule
 do
@@ -114,6 +119,7 @@ do
         return sorted
     end
 end
+
 
 local game = simulsim.defineGame()
 
@@ -178,6 +184,7 @@ function game.handleEvent(self, eventType, eventData)
     end
 end
 
+
 local network, server, client = simulsim.createGameNetwork(game, { mode = SIMULSIM_MODE or 'localhost' })
 -- local network, server, client = simulsim.createGameNetwork(game, {
 --     mode = 'development',
@@ -217,11 +224,6 @@ end
 function server.clientdisconnected(self, client)
 end
 
-local clientSelf
-function client.update(self, dt)
-    clientSelf = self
-end
-
 function client.draw(self)
     local sortedRules = sortRules(self.game:getEntitiesWhere({ type = 'rule' }))
     for _, rule in ipairs(sortedRules) do
@@ -246,235 +248,228 @@ function client.isEntityUsingPrediction()
     return true
 end
 
-do
-    local selectedRuleId
-    local selectedEntityId
-    local selectedErrShort
+local selectedRuleId
+local selectedEntityId
+local selectedErrShort
 
-    function castle.uiupdate()
-        local self = clientSelf
-        if not (self and self.game) then
-            return
-        end
-
-        L.ui.tabs('top', function()
-            L.ui.tab('rules', function()
-                -- Button to add new rule
-                if L.ui.button('add rule') then
-                    local newId = generateId()
-                    self:fireEvent('add-rule', {
-                        id = newId,
-                        priority = 0,
-                        kind = 'draw',
-                        description = 'new rule',
-                        code = [[
+function client.uiupdate(self)
+    L.ui.tabs('top', function()
+        L.ui.tab('rules', function()
+            -- Button to add new rule
+            if L.ui.button('add rule') then
+                local newId = generateId()
+                self:fireEvent('add-rule', {
+                    id = newId,
+                    priority = 0,
+                    kind = 'draw',
+                    description = 'new rule',
+                    code = [[
 function draw(game)
 end
 ]],
-                    }, { maxFramesLate = 120 })
-                    selectedRuleId = newId
-                end
-                uiSpacer()
+                }, { maxFramesLate = 120 })
+                selectedRuleId = newId
+            end
+            uiSpacer()
 
-                -- Dropdown to select rule
-                local selectedRule
-                do
-                    local selectedRuleLine
-                    local ruleLines = {}
-                    local ruleLineToRuleId = {}
-                    for _, rule in pairs(self.game:getEntitiesWhere({ type = 'rule' })) do
-                        local ruleLine = rule.description .. ' (' .. rule.id .. ')'
-                        table.insert(ruleLines, ruleLine)
-                        ruleLineToRuleId[ruleLine] = rule.id
-                        if rule.id == selectedRuleId then
-                            selectedRuleLine = ruleLine
-                        end
-                    end
-                    selectedRuleLine = L.ui.dropdown('rule', selectedRuleLine, ruleLines, {
-                        placeholder = 'select a rule...'
-                    })
-                    selectedRuleId = ruleLineToRuleId[selectedRuleLine] or selectedRuleId
-
-                    selectedRule = self.game:getEntityById(selectedRuleId)
-                end
-                if selectedRule then
-                    if L.ui.button('remove rule') then
-                        self:fireEvent('remove-rule', {
-                            id = selectedRuleId
-                        }, { maxFramesLate = 120 })
-                        selectedRule, selectedRuleId = nil, nil
+            -- Dropdown to select rule
+            local selectedRule
+            do
+                local selectedRuleLine
+                local ruleLines = {}
+                local ruleLineToRuleId = {}
+                for _, rule in pairs(self.game:getEntitiesWhere({ type = 'rule' })) do
+                    local ruleLine = rule.description .. ' (' .. rule.id .. ')'
+                    table.insert(ruleLines, ruleLine)
+                    ruleLineToRuleId[ruleLine] = rule.id
+                    if rule.id == selectedRuleId then
+                        selectedRuleLine = ruleLine
                     end
                 end
-                uiSpacer()
-
-                -- Editor for selected rule
-                if selectedRule then
-                    L.ui.box('editor-' .. selectedRuleId, function()
-                        local function onChange(propName)
-                            return function(newVal)
-                                self.game:temporarilyDisableSyncForEntity(selectedRule)
-                                self:fireEvent('update-rule-prop', {
-                                    id = selectedRule.id,
-                                    propName = propName,
-                                    propVal = newVal,
-                                })
-                            end
-                        end
-
-                        L.ui.dropdown('kind', selectedRule.kind, {
-                            'draw', 'update', 'ui',
-                        }, {
-                            onChange = onChange('kind'),
-                        })
-
-                        L.ui.textInput('description', selectedRule.description, {
-                            maxLength = 80,
-                            onChange = onChange('description'),
-                        })
-
-                        L.ui.numberInput('priority', selectedRule.priority, {
-                            onChange = onChange('priority'),
-                        })
-
-                        L.ui.codeEditor('code', selectedRule.code, {
-                            onChange = onChange('code'),
-                        })
-                    end)
-                end
-            end)
-
-            L.ui.tab('entities', function()
-                -- Button to add new entity
-                if L.ui.button('add entity') then
-                    local newId = generateId()
-                    self:fireEvent('spawn-entity', {
-                        id = newId,
-                        type = 'circle',
-                        x = math.random(0, WIDTH),
-                        y = math.random(0, HEIGHT),
-                        radius = math.random(20, 40),
-                    }, { maxFramesLate = 120 })
-                    selectedEntityId = newId
-                end
-                uiSpacer()
-
-                -- Dropdown to select entity
-                local selectedEntity
-                do
-                    local selectedEntityLine
-                    local entityLines = {}
-                    local entityLineToEntityId = {}
-                    for _, entity in pairs(self.game:getEntitiesWhere(function(e)
-                        return e.id and e.type ~= 'rule'
-                    end)) do
-                        local entityLine = entity.type .. ' (' .. entity.id .. ')'
-                        table.insert(entityLines, entityLine)
-                        entityLineToEntityId[entityLine] = entity.id
-                        if entity.id == selectedEntityId then
-                            selectedEntityLine = entityLine
-                        end
-                    end
-                    selectedEntityLine = L.ui.dropdown('entity', selectedEntityLine, entityLines, {
-                        placeholder = 'select a entity...'
-                    })
-                    selectedEntityId = entityLineToEntityId[selectedEntityLine] or selectedEntityId
-
-                    selectedEntity = self.game:getEntityById(selectedEntityId)
-                end
-                if selectedEntity then
-                    if L.ui.button('remove entity') then
-                        self:fireEvent('despawn-entity', {
-                            id = selectedEntityId
-                        }, { maxFramesLate = 120 })
-                        selectedEntity, selectedEntityId = nil, nil
-                    end
-                end
-                uiSpacer()
-
-                -- Editor for selected entity
-                if selectedEntity then
-                    L.ui.box('editor-' .. selectedEntityId, function()
-                        local pretty = serpent.block(selectedEntity)
-
-                        local sortedPropNames = {}
-                        for propName in pairs(selectedEntity) do
-                            if propName ~= 'id' then
-                                table.insert(sortedPropNames, propName)
-                            end
-                        end
-                        table.sort(sortedPropNames, function(a, b)
-                            if a == 'type' then
-                                return true
-                            end
-                            if b == 'type' then
-                                return false
-                            end
-                            return a < b
-                        end)
-
-                        for _, propName in ipairs(sortedPropNames) do
-                            local propVal = selectedEntity[propName]
-                            local newPropVal
-
-                            local propType = type(propVal)
-
-                            if propType == 'number' then
-                                newPropVal = L.ui.numberInput(propName, propVal)
-                            elseif propType == 'string' then
-                                newPropVal = L.ui.textInput(propName, propVal)
-                            elseif propType == 'boolean' then
-                                newPropVal = L.ui.checkbox(propName, propVal)
-                            end
-
-                            if newPropVal ~= propVal then
-                                self.game:temporarilyDisableSyncForEntity(selectedRule)
-                                self:fireEvent('update-entity-prop', {
-                                    id = selectedEntity.id,
-                                    propName = propName,
-                                    propVal = newPropVal,
-                                }, { maxFramesLate = 120 })
-                            end
-                        end
-                    end)
-                end
-            end)
-
-            L.ui.tab('errors', function()
-                local sortedErrs = {}
-                for _, err in pairs(errCache) do
-                    table.insert(sortedErrs, err)
-                end
-                table.sort(sortedErrs, function(e1, e2)
-                    return e1.time > e2.time
-                end)
-
-                local selectedErr
-                local errShorts = {}
-                local errShortToErrKey = {}
-                for i = 1, #sortedErrs do
-                    local err = sortedErrs[i]
-                    table.insert(errShorts, err.short)
-                    errShortToErrKey[err.short] = err.key
-                    if selectedErrShort == err.short then
-                        selectedErr = err
-                    end
-                end
-                selectedErrShort = L.ui.dropdown('error', selectedErrShort, errShorts, {
-                    placeholder = 'select an error...',
+                selectedRuleLine = L.ui.dropdown('rule', selectedRuleLine, ruleLines, {
+                    placeholder = 'select a rule...'
                 })
+                selectedRuleId = ruleLineToRuleId[selectedRuleLine] or selectedRuleId
 
-                if selectedErr then
-                    L.ui.markdown(
-                        '```\n' ..
-                        'rule: ' .. selectedErr.ruleId .. '\n' ..
-                        'count: ' .. selectedErr.count .. '\n' ..
-                        'file: ' .. selectedErr.file .. '\n' ..
-                        'line: ' .. selectedErr.line .. '\n' ..
-                        'stacktrace:\n' .. selectedErr.full .. '\n' ..
-                        '```'
-                    )
+                selectedRule = self.game:getEntityById(selectedRuleId)
+            end
+            if selectedRule then
+                if L.ui.button('remove rule') then
+                    self:fireEvent('remove-rule', {
+                        id = selectedRuleId
+                    }, { maxFramesLate = 120 })
+                    selectedRule, selectedRuleId = nil, nil
                 end
-            end)
+            end
+            uiSpacer()
+
+            -- Editor for selected rule
+            if selectedRule then
+                L.ui.box('editor-' .. selectedRuleId, function()
+                    local function onChange(propName)
+                        return function(newVal)
+                            self.game:temporarilyDisableSyncForEntity(selectedRule)
+                            self:fireEvent('update-rule-prop', {
+                                id = selectedRule.id,
+                                propName = propName,
+                                propVal = newVal,
+                            })
+                        end
+                    end
+
+                    L.ui.dropdown('kind', selectedRule.kind, {
+                        'draw', 'update', 'ui',
+                    }, {
+                        onChange = onChange('kind'),
+                    })
+
+                    L.ui.textInput('description', selectedRule.description, {
+                        maxLength = 80,
+                        onChange = onChange('description'),
+                    })
+
+                    L.ui.numberInput('priority', selectedRule.priority, {
+                        onChange = onChange('priority'),
+                    })
+
+                    L.ui.codeEditor('code', selectedRule.code, {
+                        onChange = onChange('code'),
+                    })
+                end)
+            end
         end)
-    end
+
+        L.ui.tab('entities', function()
+            -- Button to add new entity
+            if L.ui.button('add entity') then
+                local newId = generateId()
+                self:fireEvent('spawn-entity', {
+                    id = newId,
+                    type = 'circle',
+                    x = math.random(0, WIDTH),
+                    y = math.random(0, HEIGHT),
+                    radius = math.random(20, 40),
+                }, { maxFramesLate = 120 })
+                selectedEntityId = newId
+            end
+            uiSpacer()
+
+            -- Dropdown to select entity
+            local selectedEntity
+            do
+                local selectedEntityLine
+                local entityLines = {}
+                local entityLineToEntityId = {}
+                for _, entity in pairs(self.game:getEntitiesWhere(function(e)
+                    return e.id and e.type ~= 'rule'
+                end)) do
+                    local entityLine = entity.type .. ' (' .. entity.id .. ')'
+                    table.insert(entityLines, entityLine)
+                    entityLineToEntityId[entityLine] = entity.id
+                    if entity.id == selectedEntityId then
+                        selectedEntityLine = entityLine
+                    end
+                end
+                selectedEntityLine = L.ui.dropdown('entity', selectedEntityLine, entityLines, {
+                    placeholder = 'select a entity...'
+                })
+                selectedEntityId = entityLineToEntityId[selectedEntityLine] or selectedEntityId
+
+                selectedEntity = self.game:getEntityById(selectedEntityId)
+            end
+            if selectedEntity then
+                if L.ui.button('remove entity') then
+                    self:fireEvent('despawn-entity', {
+                        id = selectedEntityId
+                    }, { maxFramesLate = 120 })
+                    selectedEntity, selectedEntityId = nil, nil
+                end
+            end
+            uiSpacer()
+
+            -- Editor for selected entity
+            if selectedEntity then
+                L.ui.box('editor-' .. selectedEntityId, function()
+                    local pretty = serpent.block(selectedEntity)
+
+                    local sortedPropNames = {}
+                    for propName in pairs(selectedEntity) do
+                        if propName ~= 'id' then
+                            table.insert(sortedPropNames, propName)
+                        end
+                    end
+                    table.sort(sortedPropNames, function(a, b)
+                        if a == 'type' then
+                            return true
+                        end
+                        if b == 'type' then
+                            return false
+                        end
+                        return a < b
+                    end)
+
+                    for _, propName in ipairs(sortedPropNames) do
+                        local propVal = selectedEntity[propName]
+                        local newPropVal
+
+                        local propType = type(propVal)
+
+                        if propType == 'number' then
+                            newPropVal = L.ui.numberInput(propName, propVal)
+                        elseif propType == 'string' then
+                            newPropVal = L.ui.textInput(propName, propVal)
+                        elseif propType == 'boolean' then
+                            newPropVal = L.ui.checkbox(propName, propVal)
+                        end
+
+                        if newPropVal ~= propVal then
+                            self.game:temporarilyDisableSyncForEntity(selectedEntity)
+                            self:fireEvent('update-entity-prop', {
+                                id = selectedEntity.id,
+                                propName = propName,
+                                propVal = newPropVal,
+                            }, { maxFramesLate = 120 })
+                        end
+                    end
+                end)
+            end
+        end)
+
+        L.ui.tab('errors', function()
+            local sortedErrs = {}
+            for _, err in pairs(errCache) do
+                table.insert(sortedErrs, err)
+            end
+            table.sort(sortedErrs, function(e1, e2)
+                return e1.time > e2.time
+            end)
+
+            local selectedErr
+            local errShorts = {}
+            local errShortToErrKey = {}
+            for i = 1, #sortedErrs do
+                local err = sortedErrs[i]
+                table.insert(errShorts, err.short)
+                errShortToErrKey[err.short] = err.key
+                if selectedErrShort == err.short then
+                    selectedErr = err
+                end
+            end
+            selectedErrShort = L.ui.dropdown('error', selectedErrShort, errShorts, {
+                placeholder = 'select an error...',
+            })
+
+            if selectedErr then
+                L.ui.markdown(
+                    '```\n' ..
+                    'rule: ' .. selectedErr.ruleId .. '\n' ..
+                    'count: ' .. selectedErr.count .. '\n' ..
+                    'file: ' .. selectedErr.file .. '\n' ..
+                    'line: ' .. selectedErr.line .. '\n' ..
+                    'stacktrace:\n' .. selectedErr.full .. '\n' ..
+                    '```'
+                )
+            end
+        end)
+    end)
 end

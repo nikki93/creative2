@@ -128,7 +128,6 @@ function game.handleEvent(self, eventType, eventData)
         self:spawnEntity({
             type = 'rule',
             id = assert(eventData.id, "'add-rule' needs `id`"),
-            clientId = eventData.clientId,
             priority = assert(eventData.priority, "'add-rule' needs `priority`"),
             kind = assert(eventData.kind, "'add-rule' needs `kind`"),
             description = assert(eventData.description, "'add-rule' needs `description`"),
@@ -139,7 +138,6 @@ function game.handleEvent(self, eventType, eventData)
         assert(eventData.id, "'update-rule' needs `id`")
         local rule = self:getEntityById(eventData.id)
         if rule then
-            rule.clientId = eventData.clientId
             rule.priority = assert(eventData.priority, "'update-rule' needs `priority`")
             rule.kind = assert(eventData.kind, "'update-rule' needs `kind`")
             rule.description = assert(eventData.description, "'update-rule' needs `description`")
@@ -177,7 +175,7 @@ function game.handleEvent(self, eventType, eventData)
     end
 end
 
-local network, server, client = simulsim.createGameNetwork(game, { mode = SIMULSIM_MODE or 'local' })
+local network, server, client = simulsim.createGameNetwork(game, { mode = SIMULSIM_MODE or 'localhost' })
 -- local network, server, client = simulsim.createGameNetwork(game, {
 --     mode = 'development',
 --     numClients = 1,
@@ -241,6 +239,10 @@ function client.draw(self)
     end
 end
 
+function client.isEntityUsingPrediction()
+    return true
+end
+
 do
     local selectedRuleId
     local selectedEntityId
@@ -259,7 +261,6 @@ do
                     local newId = generateId()
                     self:fireEvent('add-rule', {
                         id = newId,
-                        clientId = self.clientId,
                         priority = 0,
                         kind = 'draw',
                         description = 'new rule',
@@ -341,7 +342,6 @@ end
                             end
                         end
                         if changed then
-                            newRule.clientId = self.clientId
                             self.game:temporarilyDisableSyncForEntity(selectedRule)
                             self:fireEvent('update-rule', newRule, { maxFramesLate = 120 })
                         end

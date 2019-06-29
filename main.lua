@@ -123,10 +123,10 @@ end
 
 local game = simulsim.defineGame()
 
-function game.load(self)
+function game:load()
 end
 
-function game.update(self, dt)
+function game:update(dt)
     local sortedRules = sortRules(self:getEntitiesWhere({ type = 'rule' }))
     for _, rule in ipairs(sortedRules) do
         if rule.kind == 'update' then
@@ -135,7 +135,7 @@ function game.update(self, dt)
     end
 end
 
-function game.handleEvent(self, eventType, eventData)
+function game:handleEvent(eventType, eventData)
     if eventType == 'add-rule' then
         self:spawnEntity({
             type = 'rule',
@@ -195,7 +195,7 @@ local network, server, client = simulsim.createGameNetwork(game, { mode = SIMULS
 --     packetLossChance = 0,
 -- })
 
-function server.load(self)
+function server:load()
     self:fireEvent('add-rule', {
         id = generateId(),
         priority = 0,
@@ -218,13 +218,13 @@ end
     })
 end
 
-function server.clientconnected(self, client)
+function server:clientconnected(client)
 end
 
-function server.clientdisconnected(self, client)
+function server:clientdisconnected(client)
 end
 
-function client.draw(self)
+function client:draw()
     local sortedRules = sortRules(self.game:getEntitiesWhere({ type = 'rule' }))
     for _, rule in ipairs(sortedRules) do
         if rule.kind == 'draw' then
@@ -244,7 +244,7 @@ function client.draw(self)
     end
 end
 
-function client.isEntityUsingPrediction()
+function client:isEntityUsingPrediction(entity)
     return true
 end
 
@@ -252,7 +252,7 @@ local selectedRuleId
 local selectedEntityId
 local selectedErrShort
 
-function client.uiupdate(self)
+function client:uiupdate()
     L.ui.tabs('top', function()
         L.ui.tab('rules', function()
             -- Button to add new rule

@@ -1,7 +1,7 @@
 L = require 'https://raw.githubusercontent.com/nikki93/L/3f63e72eef6b19a9bab9a937e17e527ae4e22230/L.lua'
 serpent = require 'https://raw.githubusercontent.com/pkulchenko/serpent/879580fb21933f63eb23ece7d60ba2349a8d2848/src/serpent.lua'
 
-simulsim = require 'https://raw.githubusercontent.com/nikki93/simulsim/6ce85976c13545613810677af67f2f2fc1cc4e2d/simulsim.lua'
+simulsim = require 'https://raw.githubusercontent.com/bridgs/simulsim/ccfcf1942fdb2b16acc87ed35815005d869cac29/simulsim.lua'
 
 
 local WIDTH, HEIGHT = 800, 450

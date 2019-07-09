@@ -1,7 +1,7 @@
 L = require 'https://raw.githubusercontent.com/nikki93/L/3f63e72eef6b19a9bab9a937e17e527ae4e22230/L.lua'
 serpent = require 'https://raw.githubusercontent.com/pkulchenko/serpent/879580fb21933f63eb23ece7d60ba2349a8d2848/src/serpent.lua'
 
-simulsim = require 'https://raw.githubusercontent.com/bridgs/simulsim/ccfcf1942fdb2b16acc87ed35815005d869cac29/simulsim.lua'
+simulsim = require 'https://raw.githubusercontent.com/bridgs/simulsim/84fa5c79466d4d03d569ae6df993a02c731bff86/simulsim.lua'
 
 
 local WIDTH, HEIGHT = 800, 450
@@ -185,15 +185,17 @@ function game:handleEvent(eventType, eventData)
 end
 
 
-local network, server, client = simulsim.createGameNetwork(game, { mode = SIMULSIM_MODE or 'localhost' })
--- local network, server, client = simulsim.createGameNetwork(game, {
+local network, server, client = simulsim.createGameNetwork(game, {
+    mode = SIMULSIM_MODE or 'localhost',
+    maxClientEventFramesLate = 999,
+    maxClientEventFramesEarly = 999,
 --     mode = 'development',
 --     numClients = 1,
 --     latency = 0,
 --     latencyDeviation = 0,
 --     latencySpikeChance = 0,
 --     packetLossChance = 0,
--- })
+})
 
 function server:load()
     self:fireEvent('add-rule', {
